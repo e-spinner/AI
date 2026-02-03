@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://github.com/e-spinner/ALPHA.git
+revision = subproject-nonsense
+directory = the_chariot
+
+[provide]
+the_chariot = the_chariot_dep
