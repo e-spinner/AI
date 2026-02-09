@@ -1,7 +1,6 @@
 #include <thread>
 
-#include "../shared/systems/camera_controller.hpp"
-#include "../shared/systems/renderer.hpp"
+#include "main.hpp"
 
 using namespace std;
 using namespace the_chariot;
@@ -9,13 +8,11 @@ using namespace the_chariot;
 // Global Settings that should probably be in the config file --- MARK: Settings
 // ------------------------------------------------------------------------
 
-// how long to wait between frames
-auto g_sleep_time = chrono::milliseconds(16); // ~60 fps
-
 // Priority order to update systems in
 enum Priority {
-  Input  = 0,
-  Render = 100,
+  Input      = 0,
+  Simulation = 50,
+  Render     = 100,
 };
 
 // Camera Settings
@@ -39,7 +36,8 @@ int main() {
   auto ECS = Coordinator();
   ECS.init();
 
-  ECS.register_components<Transform, Renderable, graphics::DirectionalLight>();
+  ECS.register_components<Transform, Renderable, Node, Head,
+                          graphics::DirectionalLight>();
 
   // Setup Camera
   // ------------------------------------------------------------------------
@@ -78,17 +76,28 @@ int main() {
 
   // Setup Environment
   // ------------------------------------------------------------------------
-  vector<Entity> ids;
 
-  // floor
   auto plane = std::make_shared<graphics::Model>("../shared/models", "plane.obj");
-  ids.push_back(ECS.create_entity(
-      Transform{.scale{100, 1, 100}},
-      Renderable{.model = std::move(plane), .casts_shadow = false}));
+  auto cube  = std::make_shared<graphics::Model>("../shared/models", "cube.obj");
+
+  // Generate maze with nodes at decision points
+  int maze_width  = 20;
+  int maze_height = 20;
+  float cell_size = 1.0f;
+
+  auto [graph, start] =
+      generate_maze(ECS, maze_width, maze_height, cell_size, cube, plane);
+
+  auto head = ECS.create_entity(
+      Transform{.position{0, 0.75f, 0}, .scale{0.25f, 1.5f, 0.25f}},
+      Renderable{.model = cube, .material = "cyan"}, Head{.current = start});
+
+  ECS.register_system<Search, Node>(update::Type::TICK, Priority::Simulation, head);
 
   // Actual Game Loop  ---  MARK: Loop
   // ------------------------------------------------------------------------
-  ECS.start();
+  ECS.start(CFG.get<float>("engine", "tick_speed", 1));
+  auto sleep_time = chrono::milliseconds(CFG.get<int>("engine", "frame_sleep", 16));
   do {
     the_world.poll_events([&](const SDL_Event &e) { magician->process_event(e); });
     magician->update_analog_actions();
@@ -97,7 +106,7 @@ int main() {
 
     the_world.present_frame();
 
-    this_thread::sleep_for(g_sleep_time);
+    this_thread::sleep_for(sleep_time);
 
   } while (!the_world.should_close() && !magician->is_active(Actions::EXIT));
 }

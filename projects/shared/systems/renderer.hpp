@@ -49,22 +49,23 @@ public:
     // ------------------------------------------------------------------------
     // PASS 1: Shadow Map
     // ------------------------------------------------------------------------
-    glViewport(0, 0, 2048, 2048); // shadow map resloution
-    glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
-    glClear(GL_DEPTH_BUFFER_BIT);
+    if (render_shadows) {
+      glViewport(0, 0, 2048, 2048); // shadow map resloution
+      glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
+      glClear(GL_DEPTH_BUFFER_BIT);
 
-    shadow.activate();
-    fetch<graphics::DirectionalLight>(sun)->set_light_space_matrix(shadow);
+      shadow.activate();
+      fetch<graphics::DirectionalLight>(sun)->set_light_space_matrix(shadow);
 
-    // Draw everything that casts a shadow
-    each<Transform, Renderable>([&](Entity e, Transform &t, Renderable &r) {
-      // if (r.casts_shadow) {
-      shadow.setM4("model", t.get_model());
-      r.model->draw(shadow);
-      // }
-    });
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      // Draw everything that casts a shadow
+      each<Transform, Renderable>([&](Entity e, Transform &t, Renderable &r) {
+        // if (r.casts_shadow) {
+        shadow.setM4("model", t.get_model());
+        r.model->draw(shadow);
+        // }
+      });
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
     // ------------------------------------------------------------------------
     // PASS 2: Main Scene
@@ -95,6 +96,7 @@ public:
 
     // Draw everything with lighting + shadow
     each<Transform, Renderable>([&](Entity e, Transform &t, Renderable &r) {
+      r.model->set_material(r.material);
       basic.setM4("model", t.get_model());
       r.model->draw(basic);
     });
@@ -104,6 +106,8 @@ public:
     sun = s;
     TRACE("Sun Entity Registered");
   }
+
+  bool render_shadows = true;
 
 private:
   int width{0};

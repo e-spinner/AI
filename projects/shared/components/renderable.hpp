@@ -8,6 +8,7 @@ using namespace the_chariot;
 // ------------------------------------------------------------------------
 struct Renderable final {
   std::shared_ptr<graphics::Model> model;
+  std::string material{""};
   bool casts_shadow{true};
 
   static std::string name() { return "Renderable"; }

@@ -61,7 +61,8 @@ vec3 blinn_phong(LIGHT l, MATERIAL m, vec3 fragment_position, vec3 normal) {
   vec4 frag_pos_light_space = light_space * vec4(fragment_position, 1.0);
   float shadow = in_shadow(frag_pos_light_space, normal, light_direction);
 
-  return ambient + (1.0 - shadow) * (diffuse + specular);
+  // return ambient + (1.0 - shadow) * (diffuse + specular);
+  return ambient + diffuse + specular;
 }
 
 out vec4 FragColor;
