@@ -12,7 +12,7 @@
 using namespace std;
 using namespace the_chariot;
 
-// Node
+// Components
 // ------------------------------------------------------------------------
 
 struct Node {
@@ -30,6 +30,8 @@ struct Head {
   static std::string name() { return "Head"; }
 };
 
+// Search Alg  ---  MARK: Search
+// ------------------------------------------------------------------------
 class Search : public System {
 public:
   Search(Entity head) : System("Search"), head(head) {}
@@ -37,9 +39,7 @@ public:
   void on_attach() override { move_head_to_node(fetch<Head>(head)->current); }
 
   void update(const Context &ctx) override {
-    auto h    = fetch<Head>(head);
-    auto next = fetch<Node>(h->current)->neighbors[0];
-    move_head_to_node(next);
+    move_head_to_node(fetch<Node>(fetch<Head>(head)->current)->neighbors[0]);
   }
 
 private:
