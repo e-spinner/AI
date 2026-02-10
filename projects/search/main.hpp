@@ -20,7 +20,7 @@ struct Node {
   int row, col;
 
   bool visited{false};
-
+  Entity from;
   static std::string name() { return "Node"; }
 };
 
@@ -60,25 +60,44 @@ public:
 
       auto current_node = fetch<Node>(current);
 
-      if (goal.first == current_node->row && goal.second == current_node->col)
+      if (goal.first == current_node->row && goal.second == current_node->col) {
         path_found = true;
+        goal_entity = current;
+      }
+
 
       for (Entity n : current_node->neighbors) {
         auto n_node = fetch<Node>(n);
         if (!n_node->visited) {
           n_node->visited = true;
+          n_node->from = current;
           q.push(n);
+
         }
       }
     }
+  }
+  else if (!pathmade){
+      Entity current = goal_entity;
+      while(!pathmade){
+          auto current_node = fetch<Node>(current);
+          stack.push(current);
+          if(!from)
+            current = current_node->from;
+          else 
+            pathmade = true;
+      }
+
+      }
   }
 
 private:
   Entity head;
   pair<int, int> goal;
   queue<Entity> q{};
-  bool path_found{false};
-
+  bool path_found{false}, pathmade = false;
+  Entity goal_entity;
+  stack<Entity> = path;
   void move_head_to_node(Entity node) {
     auto n                           = fetch<Transform>(node);
     fetch<Transform>(head)->position = {static_cast<float>(n->position.x), 1.0f,
