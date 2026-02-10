@@ -39,14 +39,14 @@ public:
   void on_attach() override { move_head_to_node(fetch<Head>(head)->current);
   // Runs once 
     
-    auto current  =  fetch<head>(head)->current;
-    auto currect_node = fetch<node>(current); 
-    current_node->visited = true
+    auto current  =  fetch<Head>(head)->current;
+    auto current_node = fetch<Node>(current); 
+    current_node->visited = true;
 
-    queue.push(current)
+    q.push(current);
   }
 
-  queue<Entity> queue{};
+  queue<Entity> q{};
 
   void update(const Context &ctx) override {
     move_head_to_node(fetch<Node>(fetch<Head>(head)->current)->neighbors[0]);
@@ -55,15 +55,15 @@ public:
     if( !queue.empty() ) {
       Entity current = queue.front();
       
-      queue.pop();
-      move_head_to_node(current)
+      q.pop();
+      move_head_to_node(current);
      
-      auto currect_node = fetch<node>(current); 
+      auto current_node = fetch<Node>(current); 
 
       for(Entity n :current_node->neighbors) {
         if (!current_node->visited){
-            current_node->visited = true
-            queue.push(n)
+            current_node->visited = true;
+            q.push(n);
         }
       }
     }
