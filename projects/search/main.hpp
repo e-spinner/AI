@@ -36,10 +36,39 @@ class Search : public System {
 public:
   Search(Entity head) : System("Search"), head(head) {}
 
-  void on_attach() override { move_head_to_node(fetch<Head>(head)->current); }
+  void on_attach() override { move_head_to_node(fetch<Head>(head)->current);
+  // Runs once 
+    
+    auto current  =  fetch<head>(head)->current;
+    auto currect_node = fetch<node>(current); 
+    current_node->visited = true
+
+    queue.push(current)
+  }
+
+  queue<Entity> queue{};
 
   void update(const Context &ctx) override {
     move_head_to_node(fetch<Node>(fetch<Head>(head)->current)->neighbors[0]);
+    // where while loop lives 
+
+    if( !queue.empty() ) {
+      Entity current = queue.front();
+      
+      queue.pop();
+      move_head_to_node(current)
+     
+      auto currect_node = fetch<node>(current); 
+
+      for(Entity n :current_node->neighbors) {
+        if (!current_node->visited){
+            current_node->visited = true
+            queue.push(n)
+        }
+      }
+    }
+
+
   }
 
 private:
