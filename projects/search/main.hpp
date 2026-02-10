@@ -52,8 +52,8 @@ public:
     move_head_to_node(fetch<Node>(fetch<Head>(head)->current)->neighbors[0]);
     // where while loop lives 
 
-    if( !queue.empty() ) {
-      Entity current = queue.front();
+    if( !q.empty() ) {
+      Entity current = q.front();
       
       q.pop();
       move_head_to_node(current);
@@ -61,8 +61,9 @@ public:
       auto current_node = fetch<Node>(current); 
 
       for(Entity n :current_node->neighbors) {
-        if (!current_node->visited){
-            current_node->visited = true;
+        auto n_node = fetch<Node>(n)
+        if (!n_node->visited){
+            n_node->visited = true;
             q.push(n);
         }
       }
