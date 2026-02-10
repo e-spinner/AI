@@ -76,5 +76,7 @@ void main() {
 
   vec3 lighting = blinn_phong(light, material, f_in.fragment_position, f_in.normal);
 
-  FragColor = vec4(lighting, 1.0);
+  vec3 color = material.diffuse;
+
+  FragColor = vec4(color, 1.0);
 }

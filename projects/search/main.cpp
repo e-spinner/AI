@@ -1,5 +1,7 @@
+#include <cmath>
 #include <thread>
 
+#include "ecs/services/camera_service.hpp"
 #include "main.hpp"
 
 using namespace std;
@@ -17,8 +19,8 @@ enum Priority {
 
 // Camera Settings
 namespace cam {
-V3f initial_position{5.0f, 5.0f, 5.0f};      // [m?]
-V2f initial_orientaion{-M_PI / 4.0f, -2.35}; // [rad] { pitch, yaw }
+V3f initial_position{-0.5, 133, -0.5};               // [m?]
+V2f initial_orientaion{-camera::G_MAX_PITCH, -1.57}; // [rad] { pitch, yaw }
 }; // namespace cam
 
 // MARK: Main
@@ -41,12 +43,12 @@ int main() {
 
   // Setup Camera
   // ------------------------------------------------------------------------
-  auto camera   = ECS.register_service<camera::Service>((float)width / height);
-  auto cam_ctrl = ECS.register_system<CameraController>(
-      update::Type::FRAME, Priority::Input,
-      CFG.get<float>("camera", "move_speed", 0.1f),
-      CFG.get<float>("camera", "mouse_sensitivity", 0.1f),
-      CFG.get<float>("camera", "zoom_speed", 2.0f));
+  auto camera = ECS.register_service<camera::Service>((float)width / height);
+  // auto cam_ctrl = ECS.register_system<CameraController>(
+  //     update::Type::FRAME, Priority::Input,
+  //     CFG.get<float>("camera", "move_speed", 0.1f),
+  //     CFG.get<float>("camera", "mouse_sensitivity", 0.1f),
+  //     CFG.get<float>("camera", "zoom_speed", 2.0f));
 
   camera->setup_camera(cam::initial_position, cam::initial_orientaion,
                        CFG.get<float>("camera", "fov", 60.0f),
@@ -71,7 +73,7 @@ int main() {
   auto renderer = ECS.register_system<Renderer, Transform, Renderable>(
       update::Type::FRAME, Priority::Render, width, height);
 
-  Entity sun = ECS.create_entity(graphics::DirectionalLight{});
+  Entity sun = ECS.create_entity(graphics::DirectionalLight{.position{50.0f}});
   renderer->set_sun(sun);
 
   // Setup Environment
@@ -81,18 +83,18 @@ int main() {
   auto cube  = std::make_shared<graphics::Model>("../shared/models", "cube.obj");
 
   // Generate maze with nodes at decision points
-  int maze_width  = 20;
-  int maze_height = 20;
+  auto size       = CFG.get<int>("engine", "maze_side", 20);
   float cell_size = 1.0f;
 
-  auto [graph, start, goal] =
-      generate_maze(ECS, maze_width, maze_height, cell_size, cube, plane);
+  auto [nodes, walls, start, goal] =
+      generate_maze(ECS, size, size, cell_size,
+                    CFG.get<bool>("engine", "walls", true), cube, plane);
 
   auto head = ECS.create_entity(
       Transform{.position{0, 0.75f, 0}, .scale{0.25f, 1.5f, 0.25f}},
       Renderable{.model = cube, .material = "cyan"}, Head{.current = start});
 
-  ECS.register_system<Search, Node>(
+  auto search = ECS.register_system<Search, Node>(
       update::Type::TICK, Priority::Simulation, head,
       pair<int, int>{ECS.try_get_component<Node>(goal)->row,
                      ECS.try_get_component<Node>(goal)->col});
@@ -107,6 +109,24 @@ int main() {
     magician->update_analog_actions();
 
     ECS.update();
+
+    if (search->done()) {
+      if (CFG.get<bool>("engine", "walls", true))
+        for (auto wall : walls) ECS.destroy_entity(wall);
+      for (auto node : nodes) ECS.destroy_entity(node);
+      ECS.destroy_entity(head);
+
+      tie(nodes, walls, start, goal) =
+          generate_maze(ECS, size, size, cell_size,
+                        CFG.get<bool>("engine", "walls", true), cube, plane);
+
+      head = ECS.create_entity(
+          Transform{.position{0, 0.75f, 0}, .scale{0.25f, 1.5f, 0.25f}},
+          Renderable{.model = cube, .material = "cyan"}, Head{.current = start});
+
+      search->reset(head, pair<int, int>{ECS.try_get_component<Node>(goal)->row,
+                                         ECS.try_get_component<Node>(goal)->col});
+    }
 
     the_world.present_frame();
 

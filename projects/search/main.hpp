@@ -8,6 +8,9 @@
 #include <memory>
 #include <queue>
 #include <random>
+#include <stack>
+#include <type_traits>
+#include <vector>
 
 using namespace std;
 using namespace the_chariot;
@@ -61,43 +64,67 @@ public:
       auto current_node = fetch<Node>(current);
 
       if (goal.first == current_node->row && goal.second == current_node->col) {
-        path_found = true;
+        path_found  = true;
         goal_entity = current;
       }
-
 
       for (Entity n : current_node->neighbors) {
         auto n_node = fetch<Node>(n);
         if (!n_node->visited) {
           n_node->visited = true;
-          n_node->from = current;
+          n_node->from    = current;
           q.push(n);
-
         }
       }
+
+    } else if (!path_made) {
+      Entity current = goal_entity;
+      while (!path_made) {
+        auto current_node = fetch<Node>(current);
+        s.push(current);
+        if (current_node->from)
+          current = current_node->from;
+        else
+          path_made = true;
+      }
+    } else if (!s.empty()) {
+      auto current = s.top();
+      s.pop();
+      move_head_to_node(current);
+      fetch<Renderable>(current)->material = "pink";
+    } else {
+      path_drawn = true;
     }
   }
-  else if (!pathmade){
-      Entity current = goal_entity;
-      while(!pathmade){
-          auto current_node = fetch<Node>(current);
-          stack.push(current);
-          if(!from)
-            current = current_node->from;
-          else 
-            pathmade = true;
-      }
 
-      }
+  void reset(Entity h, pair<int, int> g) {
+    head        = h;
+    goal        = g;
+    q           = queue<Entity>{};
+    path_found  = false;
+    path_made   = false;
+    path_drawn  = false;
+    goal_entity = INVALID_ENTITY;
+    s           = stack<Entity>{};
+    move_head_to_node(fetch<Head>(head)->current);
+    // Runs once
+
+    auto current          = fetch<Head>(head)->current;
+    auto current_node     = fetch<Node>(current);
+    current_node->visited = true;
+
+    q.push(current);
   }
+
+  bool done() { return path_drawn; }
 
 private:
   Entity head;
   pair<int, int> goal;
   queue<Entity> q{};
-  bool path_found{false}, pathmade = false;
+  bool path_found{false}, path_made = false, path_drawn{false};
   Entity goal_entity;
-  stack<Entity> = path;
+  stack<Entity> s{};
   void move_head_to_node(Entity node) {
     auto n                           = fetch<Transform>(node);
     fetch<Transform>(head)->position = {static_cast<float>(n->position.x), 1.0f,
@@ -139,9 +166,9 @@ static void generate_maze_recursive(vector<vector<int>> &maze,
 }
 
 // Generate a grid-based maze with nodes at decision points
-[[maybe_unused]] static tuple<vector<Entity>, Entity, Entity>
+[[maybe_unused]] static tuple<vector<Entity>, vector<Entity>, Entity, Entity>
 generate_maze(Coordinator &ecs, int width, int height, float cell_size,
-              std::shared_ptr<graphics::Model> cube,
+              bool render_walls, std::shared_ptr<graphics::Model> cube,
               std::shared_ptr<graphics::Model> plane) {
   // Ensure odd dimensions for proper maze generation
   int cols = (width % 2 == 0) ? width + 1 : width;
@@ -269,24 +296,28 @@ generate_maze(Coordinator &ecs, int width, int height, float cell_size,
   nodes.push_back(start_node);
   nodes.push_back(goal_node);
 
+  vector<Entity> walls;
+
   // render maze walls
-  for (int r = 0; r < rows; ++r) {
-    for (int c = 0; c < cols; ++c) {
-      if (maze[r][c] == 0) { // Wall
-        if ((r == start_node_row && c == start_node_col) ||
-            (r == goal_node_row && c == goal_node_col))
-          continue;
+  if (render_walls) {
+    for (int r = 0; r < rows; ++r) {
+      for (int c = 0; c < cols; ++c) {
+        if (maze[r][c] == 0) { // Wall
+          if ((r == start_node_row && c == start_node_col) ||
+              (r == goal_node_row && c == goal_node_col))
+            continue;
 
-        float x = (c - cols / 2.0f) * cell_size;
-        float z = (r - rows / 2.0f) * cell_size;
+          float x = (c - cols / 2.0f) * cell_size;
+          float z = (r - rows / 2.0f) * cell_size;
 
-        auto _ = ecs.create_entity(
-            Transform{.position = {x, 0.25f, z},
-                      .scale    = V3f{cell_size * 0.9f, 0.5f, cell_size * 0.9f}},
-            Renderable{.model = cube, .material = "coral", .casts_shadow = true});
+          walls.push_back(ecs.create_entity(
+              Transform{.position = {x, 0.25f, z},
+                        .scale    = V3f{cell_size * 0.9f, 0.5f, cell_size * 0.9f}},
+              Renderable{.model = cube, .material = "grey", .casts_shadow = true}));
+        }
       }
     }
   }
 
-  return {nodes, start_node, goal_node};
+  return {nodes, walls, start_node, goal_node};
 }
