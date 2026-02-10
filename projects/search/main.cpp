@@ -85,19 +85,23 @@ int main() {
   int maze_height = 20;
   float cell_size = 1.0f;
 
-  auto [graph, start] =
+  auto [graph, start, goal] =
       generate_maze(ECS, maze_width, maze_height, cell_size, cube, plane);
 
   auto head = ECS.create_entity(
       Transform{.position{0, 0.75f, 0}, .scale{0.25f, 1.5f, 0.25f}},
       Renderable{.model = cube, .material = "cyan"}, Head{.current = start});
 
-  ECS.register_system<Search, Node>(update::Type::TICK, Priority::Simulation, head);
+  ECS.register_system<Search, Node>(
+      update::Type::TICK, Priority::Simulation, head,
+      pair<int, int>{ECS.try_get_component<Node>(goal)->row,
+                     ECS.try_get_component<Node>(goal)->col});
 
   // Actual Game Loop  ---  MARK: Loop
   // ------------------------------------------------------------------------
-  ECS.start(CFG.get<float>("engine", "tick_speed", 1));
-  auto sleep_time = chrono::milliseconds(CFG.get<int>("engine", "frame_sleep", 16));
+  ECS.start(1.0f / CFG.get<float>("engine", "tick_speed", 1));
+  auto sleep_time =
+      chrono::milliseconds(1 / CFG.get<int>("engine", "frame_sleep", 16));
   do {
     the_world.poll_events([&](const SDL_Event &e) { magician->process_event(e); });
     magician->update_analog_actions();

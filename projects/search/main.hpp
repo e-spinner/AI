@@ -34,46 +34,50 @@ struct Head {
 // ------------------------------------------------------------------------
 class Search : public System {
 public:
-  Search(Entity head) : System("Search"), head(head) {}
+  Search(Entity head, pair<int, int> goal)
+      : System("Search"), head(head), goal(goal) {}
 
-  void on_attach() override { move_head_to_node(fetch<Head>(head)->current);
-  // Runs once 
-    
-    auto current  =  fetch<Head>(head)->current;
-    auto current_node = fetch<Node>(current); 
+  void on_attach() override {
+    move_head_to_node(fetch<Head>(head)->current);
+    // Runs once
+
+    auto current          = fetch<Head>(head)->current;
+    auto current_node     = fetch<Node>(current);
     current_node->visited = true;
 
     q.push(current);
   }
 
-  queue<Entity> q{};
-
   void update(const Context &ctx) override {
-    move_head_to_node(fetch<Node>(fetch<Head>(head)->current)->neighbors[0]);
-    // where while loop lives 
+    // where while loop lives
 
-    if( !q.empty() ) {
+    if (!q.empty() && !path_found) {
       Entity current = q.front();
-      
+
       q.pop();
       move_head_to_node(current);
-     
-      auto current_node = fetch<Node>(current); 
+      fetch<Renderable>(current)->material = "blue";
 
-      for(Entity n :current_node->neighbors) {
-        auto n_node = fetch<Node>(n)
-        if (!n_node->visited){
-            n_node->visited = true;
-            q.push(n);
+      auto current_node = fetch<Node>(current);
+
+      if (goal.first == current_node->row && goal.second == current_node->col)
+        path_found = true;
+
+      for (Entity n : current_node->neighbors) {
+        auto n_node = fetch<Node>(n);
+        if (!n_node->visited) {
+          n_node->visited = true;
+          q.push(n);
         }
       }
     }
-
-
   }
 
 private:
   Entity head;
+  pair<int, int> goal;
+  queue<Entity> q{};
+  bool path_found{false};
 
   void move_head_to_node(Entity node) {
     auto n                           = fetch<Transform>(node);
@@ -116,7 +120,7 @@ static void generate_maze_recursive(vector<vector<int>> &maze,
 }
 
 // Generate a grid-based maze with nodes at decision points
-[[maybe_unused]] static pair<vector<Entity>, Entity>
+[[maybe_unused]] static tuple<vector<Entity>, Entity, Entity>
 generate_maze(Coordinator &ecs, int width, int height, float cell_size,
               std::shared_ptr<graphics::Model> cube,
               std::shared_ptr<graphics::Model> plane) {
@@ -265,5 +269,5 @@ generate_maze(Coordinator &ecs, int width, int height, float cell_size,
     }
   }
 
-  return {nodes, start_node};
+  return {nodes, start_node, goal_node};
 }
