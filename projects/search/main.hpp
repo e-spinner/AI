@@ -1,16 +1,12 @@
 #pragma once
 
-#include "../shared/systems/camera_controller.hpp"
-#include "../shared/systems/renderer.hpp"
-#include "ecs/src/types.hpp"
 #include <algorithm>
-#include <map>
-#include <memory>
 #include <queue>
 #include <random>
 #include <stack>
-#include <type_traits>
-#include <vector>
+
+#include "../shared/systems/camera_controller.hpp"
+#include "../shared/systems/renderer.hpp"
 
 using namespace std;
 using namespace the_chariot;
@@ -18,6 +14,8 @@ using namespace the_chariot;
 // Components
 // ------------------------------------------------------------------------
 
+// Emulates a Adjacency List + other important data
+// Each Node in the list has what is essentially a list of ptrs to neighbors
 struct Node {
   vector<Entity> neighbors;
   int row, col;
@@ -52,8 +50,10 @@ public:
   }
 
   void update(const Context &ctx) override {
-    // where while loop lives
+    // Bredth First Search state machine
 
+    // State 0: Searching the maze
+    // ------------------------------------------------------------------------
     if (!q.empty() && !path_found) {
       Entity current = q.front();
 
@@ -63,6 +63,7 @@ public:
 
       auto current_node = fetch<Node>(current);
 
+      // break early if goal found
       if (goal.first == current_node->row && goal.second == current_node->col) {
         path_found  = true;
         goal_entity = current;
@@ -71,22 +72,30 @@ public:
       for (Entity n : current_node->neighbors) {
         auto n_node = fetch<Node>(n);
         if (!n_node->visited) {
+          // avoid revisiting
           n_node->visited = true;
-          n_node->from    = current;
+          // used to backtrack
+          n_node->from = current;
           q.push(n);
         }
       }
 
+      // State 1: Backtracking from target to build path
+      // ------------------------------------------------------------------------
     } else if (!path_made) {
       Entity current = goal_entity;
       while (!path_made) {
         auto current_node = fetch<Node>(current);
+        // use stack to flip path around
         s.push(current);
         if (current_node->from)
           current = current_node->from;
         else
           path_made = true;
       }
+
+      // state 2: Animate head from state to goal via path in stack s
+      // ------------------------------------------------------------------------
     } else if (!s.empty()) {
       auto current = s.top();
       s.pop();
@@ -97,6 +106,7 @@ public:
     }
   }
 
+  // Allow reset to initial state
   void reset(Entity h, pair<int, int> g) {
     head        = h;
     goal        = g;
@@ -106,14 +116,7 @@ public:
     path_drawn  = false;
     goal_entity = INVALID_ENTITY;
     s           = stack<Entity>{};
-    move_head_to_node(fetch<Head>(head)->current);
-    // Runs once
-
-    auto current          = fetch<Head>(head)->current;
-    auto current_node     = fetch<Node>(current);
-    current_node->visited = true;
-
-    q.push(current);
+    on_attach();
   }
 
   bool done() { return path_drawn; }

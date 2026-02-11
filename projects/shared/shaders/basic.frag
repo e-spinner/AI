@@ -74,7 +74,8 @@ void main() {
   // +
   //                            light.attenuation.z * (distance * distance));
 
-  vec3 lighting = blinn_phong(light, material, f_in.fragment_position, f_in.normal);
+  // vec3 lighting = blinn_phong(light, material, f_in.fragment_position,
+  // f_in.normal);
 
   vec3 color = material.diffuse;
 

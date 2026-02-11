@@ -1,7 +1,6 @@
 #include <cmath>
 #include <thread>
 
-#include "ecs/services/camera_service.hpp"
 #include "main.hpp"
 
 using namespace std;
@@ -44,18 +43,21 @@ int main() {
   // Setup Camera
   // ------------------------------------------------------------------------
   auto camera = ECS.register_service<camera::Service>((float)width / height);
-  // auto cam_ctrl = ECS.register_system<CameraController>(
-  //     update::Type::FRAME, Priority::Input,
-  //     CFG.get<float>("camera", "move_speed", 0.1f),
-  //     CFG.get<float>("camera", "mouse_sensitivity", 0.1f),
-  //     CFG.get<float>("camera", "zoom_speed", 2.0f));
+  // std::shared_ptr<CameraController> cam_ctrl{nullptr};
+  if (CFG.get<bool>("engine", "camera_locked", true)) {
+    auto cam_ctrl = ECS.register_system<CameraController>(
+        update::Type::FRAME, Priority::Input,
+        CFG.get<float>("camera", "move_speed", 0.1f),
+        CFG.get<float>("camera", "mouse_sensitivity", 0.1f),
+        CFG.get<float>("camera", "zoom_speed", 2.0f));
+  }
 
   camera->setup_camera(cam::initial_position, cam::initial_orientaion,
                        CFG.get<float>("camera", "fov", 60.0f),
                        CFG.get<float>("camera", "near_plane", 0.1f),
                        CFG.get<float>("camera", "far_plane", 200.0f));
 
-  // Setup User Input "Actions"
+  // Setup User Input "Actions" bindings from config.cfg sections
   // ------------------------------------------------------------------------
   Input::Binding::Array BINDINGS = {{"keyboard", Input::Device::KEYBOARD},
                                     {"mouse", Input::Device::MOUSE},
@@ -104,6 +106,7 @@ int main() {
   ECS.start(1.0f / CFG.get<float>("engine", "tick_speed", 1));
   auto sleep_time =
       chrono::milliseconds(1 / CFG.get<int>("engine", "frame_sleep", 16));
+
   do {
     the_world.poll_events([&](const SDL_Event &e) { magician->process_event(e); });
     magician->update_analog_actions();
