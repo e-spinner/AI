@@ -96,8 +96,14 @@ int main() {
       Transform{.position{0, 0.75f, 0}, .scale{0.25f, 1.5f, 0.25f}},
       Renderable{.model = cube, .material = "cyan"}, Head{.current = start});
 
-  auto search = ECS.register_system<Search, Node>(
-      update::Type::TICK, Priority::Simulation, head,
+  bool race = false;
+  auto dfs  = ECS.register_system<DFS, Node>(
+      update::Type::TICK, Priority::Simulation, &race, head,
+      pair<int, int>{ECS.try_get_component<Node>(goal)->row,
+                      ECS.try_get_component<Node>(goal)->col});
+
+  auto bfs = ECS.register_system<BFS, Node>(
+      update::Type::TICK, Priority::Simulation, &race, head,
       pair<int, int>{ECS.try_get_component<Node>(goal)->row,
                      ECS.try_get_component<Node>(goal)->col});
 
@@ -113,7 +119,8 @@ int main() {
 
     ECS.update();
 
-    if (search->done()) {
+    if (bfs->done() && dfs->done() && magician->is_active(Actions::CLICK)) {
+
       if (CFG.get<bool>("engine", "walls", true))
         for (auto wall : walls) ECS.destroy_entity(wall);
       for (auto node : nodes) ECS.destroy_entity(node);
@@ -127,8 +134,11 @@ int main() {
           Transform{.position{0, 0.75f, 0}, .scale{0.25f, 1.5f, 0.25f}},
           Renderable{.model = cube, .material = "cyan"}, Head{.current = start});
 
-      search->reset(head, pair<int, int>{ECS.try_get_component<Node>(goal)->row,
-                                         ECS.try_get_component<Node>(goal)->col});
+      bfs->reset(head, pair<int, int>{ECS.try_get_component<Node>(goal)->row,
+                                      ECS.try_get_component<Node>(goal)->col});
+      dfs->reset(head, pair<int, int>{ECS.try_get_component<Node>(goal)->row,
+                                      ECS.try_get_component<Node>(goal)->col});
+      race = false;
     }
 
     the_world.present_frame();

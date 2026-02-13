@@ -20,8 +20,10 @@ struct Node {
   vector<Entity> neighbors;
   int row, col;
 
-  bool visited{false};
-  Entity from;
+  bool BFS_visited{false};
+  bool DFS_visited{false};
+  Entity BFS_from;
+  Entity DFS_from;
   static std::string name() { return "Node"; }
 };
 
@@ -31,20 +33,20 @@ struct Head {
   static std::string name() { return "Head"; }
 };
 
-// Search Alg  ---  MARK: Search
+// MARK: BFS
 // ------------------------------------------------------------------------
-class Search : public System {
+class BFS : public System {
 public:
-  Search(Entity head, pair<int, int> goal)
-      : System("Search"), head(head), goal(goal) {}
+  BFS(bool *race, Entity head, pair<int, int> goal)
+      : System("BFS"), head(head), goal(goal), race(race) {}
 
   void on_attach() override {
     move_head_to_node(fetch<Head>(head)->current);
     // Runs once
 
-    auto current          = fetch<Head>(head)->current;
-    auto current_node     = fetch<Node>(current);
-    current_node->visited = true;
+    auto current              = fetch<Head>(head)->current;
+    auto current_node         = fetch<Node>(current);
+    current_node->BFS_visited = true;
 
     q.push(current);
   }
@@ -55,27 +57,38 @@ public:
     // State 0: Searching the maze
     // ------------------------------------------------------------------------
     if (!q.empty() && !path_found) {
+      // check if other search has won
+      if (*race) path_found = path_made = path_drawn = true;
+
       Entity current = q.front();
 
       q.pop();
       move_head_to_node(current);
-      fetch<Renderable>(current)->material = "blue";
 
       auto current_node = fetch<Node>(current);
+      auto renderable   = fetch<Renderable>(current);
+
+      // Color based on whether both algorithms have visited
+      if (current_node->BFS_visited && current_node->DFS_visited) {
+        renderable->material = "yellow";
+      } else {
+        renderable->material = "blue";
+      }
 
       // break early if goal found
       if (goal.first == current_node->row && goal.second == current_node->col) {
         path_found  = true;
         goal_entity = current;
+        *race       = true;
       }
 
       for (Entity n : current_node->neighbors) {
         auto n_node = fetch<Node>(n);
-        if (!n_node->visited) {
+        if (!n_node->BFS_visited) {
           // avoid revisiting
-          n_node->visited = true;
+          n_node->BFS_visited = true;
           // used to backtrack
-          n_node->from = current;
+          n_node->BFS_from = current;
           q.push(n);
         }
       }
@@ -88,8 +101,8 @@ public:
         auto current_node = fetch<Node>(current);
         // use stack to flip path around
         s.push(current);
-        if (current_node->from)
-          current = current_node->from;
+        if (current_node->BFS_from)
+          current = current_node->BFS_from;
         else
           path_made = true;
       }
@@ -128,6 +141,7 @@ private:
   bool path_found{false}, path_made = false, path_drawn{false};
   Entity goal_entity;
   stack<Entity> s{};
+  bool *race = nullptr;
   void move_head_to_node(Entity node) {
     auto n                           = fetch<Transform>(node);
     fetch<Transform>(head)->position = {static_cast<float>(n->position.x), 1.0f,
@@ -136,6 +150,121 @@ private:
   }
 };
 
+// MARK: DFS
+// ------------------------------------------------------------------------
+class DFS : public System {
+public:
+  DFS(bool *race, Entity head, pair<int, int> goal)
+      : System("DFS"), head(head), goal(goal), race(race) {}
+
+  void on_attach() override {
+    move_head_to_node(fetch<Head>(head)->current);
+    // Runs once
+
+    auto current              = fetch<Head>(head)->current;
+    auto current_node         = fetch<Node>(current);
+    current_node->DFS_visited = true;
+
+    s.push(current);
+  }
+
+  void update(const Context &ctx) override {
+    // Depth First Search state machine
+
+    // State 0: Searching the maze
+    // ------------------------------------------------------------------------
+    if (!s.empty() && !path_found) {
+      // check if other search has won
+      if (*race) path_found = path_made = path_drawn = true;
+
+      Entity current = s.top();
+      s.pop();
+      move_head_to_node(current);
+
+      auto current_node = fetch<Node>(current);
+      auto renderable   = fetch<Renderable>(current);
+
+      // Color based on whether both algorithms have visited
+      if (current_node->BFS_visited && current_node->DFS_visited) {
+        renderable->material = "yellow";
+      } else {
+        renderable->material = "ggreen";
+      }
+
+      // break early if goal found
+      if (goal.first == current_node->row && goal.second == current_node->col) {
+        path_found  = true;
+        goal_entity = current;
+        *race       = true;
+      }
+
+      for (Entity n : current_node->neighbors) {
+        auto n_node = fetch<Node>(n);
+        if (!n_node->DFS_visited) {
+          // avoid revisiting
+          n_node->DFS_visited = true;
+          // used to backtrack
+          n_node->DFS_from = current;
+          s.push(n);
+        }
+      }
+
+      // State 1: Backtracking from target to build path
+      // ------------------------------------------------------------------------
+    } else if (!path_made) {
+      Entity current = goal_entity;
+      while (!path_made) {
+        auto current_node = fetch<Node>(current);
+        // use stack to flip path around
+        path_stack.push(current);
+        if (current_node->DFS_from)
+          current = current_node->DFS_from;
+        else
+          path_made = true;
+      }
+
+      // state 2: Animate head from start to goal via path in stack path_stack
+      // ------------------------------------------------------------------------
+    } else if (!path_stack.empty()) {
+      auto current = path_stack.top();
+      path_stack.pop();
+      move_head_to_node(current);
+      fetch<Renderable>(current)->material = "pink";
+    } else {
+      path_drawn = true;
+    }
+  }
+
+  // Allow reset to initial state
+  void reset(Entity h, pair<int, int> g) {
+    head        = h;
+    goal        = g;
+    s           = stack<Entity>{};
+    path_found  = false;
+    path_made   = false;
+    path_drawn  = false;
+    goal_entity = INVALID_ENTITY;
+    path_stack  = stack<Entity>{};
+    on_attach();
+  }
+
+  bool done() { return path_drawn; }
+
+private:
+  Entity head;
+  pair<int, int> goal;
+  stack<Entity> s{};
+  bool path_found{false}, path_made = false, path_drawn{false};
+  Entity goal_entity;
+  stack<Entity> path_stack{};
+  bool *race = nullptr;
+  void move_head_to_node(Entity node) {
+    auto n                           = fetch<Transform>(node);
+    fetch<Transform>(head)->position = {static_cast<float>(n->position.x), 1.0f,
+                                        static_cast<float>(n->position.z)};
+    fetch<Head>(head)->current       = node;
+  }
+};
 // MARK: Maze
 // ------------------------------------------------------------------------
 
